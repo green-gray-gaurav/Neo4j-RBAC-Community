@@ -190,21 +190,27 @@ The adapter is isolated in `CypherParserProof` to keep that dependency visible.
 - [Official 5.23.0 parser artifact dependencies](https://github.com/neo4j/neo4j/blob/5.23.0/community/cypher/front-end/parser/v5/ast-factory/pom.xml)
 - [Official 5.23.0 AST printer](https://github.com/neo4j/neo4j/blob/5.23.0/community/cypher/front-end/ast/src/main/scala/org/neo4j/cypher/internal/ast/prettifier/Prettifier.scala)
 
-## Next milestones
+## Delivery status
 
-1. **Parser proof (this module).** Native syntax tree, inspection, and corpus.
-2. **Policy store.** Trusted identity lookup, role grants, and revocation behavior.
-3. **Authorization compiler.** Fail-closed AST validation, scope tracking, and
-   runtime label filters before aggregation. Reject unknown constructs.
-4. **Bounded executor.** EXPLAIN classification, deadlines, cancellation, and limits.
-5. **Redash adapter.** Verified identity contract for interactive and scheduled queries.
-6. **Adversarial testing.** End-to-end authorization and bypass tests against 5.23.0.
+| Component | Current all-label release |
+| --- | --- |
+| Parser and classifier | Official Neo4j 5.23.0 AST parser and EXPLAIN classification implemented. |
+| Policy store | Administrator-owned permissions file, native user authentication, and immediate API grant revocation implemented. |
+| Authorization | Fail-closed AST validation and readOnly/full enforcement implemented across all labels. |
+| Bounded executor | Classification and execution share one transaction, with deadlines, capacity/result limits, and rollback on rejected results. |
+| Redash adapter | Redash 26.9.0 browser login, query rendering, worker execution, and scheduled refresh verified locally. |
+| Verification | 102 Java tests and 4 adapter tests pass. Live Redash checks verify reads, rejected writes without database changes, and scheduled execution. |
 
-The parser, classifier, all-label API, permissions file and Redash adapter are
-implemented. Graph-based per-label authorization remains future work.
+The [test-stack guide](redash/test-stack/README.md) contains repeatable startup,
+verification, and shutdown commands. Its generated credentials and local state
+are excluded from Git and Docker build contexts.
+
+Graph-based per-label policy, scope tracking, and runtime label filters remain
+future work. The remote Linux service and cross-host SSH tunnel require separate
+deployment acceptance checks.
 
 ## Contributors
 
-- **OpenAI Codex (AI coding assistant)** — assisted with the Neo4j 5.23.0
-  parser proof, AST inspection, tests, build setup, and documentation under
-  the repository owner's direction.
+- **OpenAI Codex (AI coding assistant)** — assisted with the Neo4j 5.23.0 parser,
+  classifier, API, Redash integration, tests, and documentation under the
+  repository owner's direction.
