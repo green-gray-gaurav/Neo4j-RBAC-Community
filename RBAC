@@ -1,0 +1,95 @@
+# Role-Based Access Control (RBAC)
+
+## Purpose
+
+Define which node labels an authenticated user can query through the Cypher
+proxy described in `overview.md`. The graph below stores authorization metadata;
+the proxy must enforce these rules before executing a query.
+
+## Graph model
+
+```text
+(:User)-[:HAS_ROLE]->(:Role)-[:HAS_ACCESS_OF_NODE]->(:AccessNode)
+```
+
+### Nodes
+
+| Label | Properties | Meaning |
+| --- | --- | --- |
+| `User` | `name` | A user identified by a unique, stable authenticated username. |
+| `Role` | `name`, `privileges` | A named set of permissions shared by users. |
+| `AccessNode` | `name` | An access target representing one exact data-node label, such as `Customer`. |
+
+Example properties:
+
+```json
+{"User": {"name": "analyst_01"}}
+{"Role": {"name": "customer_reader", "privileges": ["readOnly"]}}
+{"AccessNode": {"name": "Customer"}}
+```
+
+`AccessNode` is a policy node, not a business-data node. Its `name` must match the
+target label exactly, including case. User names, role names, and access-target
+names must each be unique within their respective node label.
+
+### Relationships
+
+| Relationship | Direction | Meaning |
+| --- | --- | --- |
+| `HAS_ROLE` | `User` → `Role` | Assigns a role to a user. A user may have multiple roles. |
+| `HAS_ACCESS_OF_NODE` | `Role` → `AccessNode` | Grants the role access to the target label. A role may have multiple targets. |
+
+## Privileges
+
+Use the property name `privileges` consistently (correcting `privilages`).
+
+| Value | Intended meaning | Current proxy behavior |
+| --- | --- | --- |
+| `readOnly` | Read the labels linked to the role. | Permit only reads that pass the full validation policy. |
+| `full` | Read and write the labels linked to the role. | Writes remain rejected by the current read-only proxy. |
+
+These values are alternatives: use one per role, such as `["readOnly"]`.
+`full` does not grant access to every label, administrative commands, or policy
+metadata. Write support requires a separate validation design before activation.
+
+Privileges apply to every access target linked to the role. If one user needs
+different privileges for different labels, assign separate roles.
+
+## Authorization rules
+
+1. Resolve the user from trusted authentication context, never from a username
+   supplied inside the query.
+2. Collect grants through `User → HAS_ROLE → Role → HAS_ACCESS_OF_NODE → AccessNode`.
+   Grants from multiple roles are additive; this model has no explicit deny rules.
+3. Deny access when no applicable grant exists. Missing users, missing roles,
+   empty privileges, and unknown privilege values must not produce access.
+4. Validate the complete parsed query, including every subquery and `UNION`
+   branch. Every possible data access must be covered by an applicable grant.
+5. Initially reject patterns whose label scope cannot be proven, including
+   unlabeled scans and dynamic label access. For multi-label nodes, require
+   authorization for all labels; a permitted label must not expose a node that
+   also carries a restricted label.
+6. Prevent query access to RBAC metadata and prevent users from changing their
+   own role assignments or grants. Manage policy through a trusted admin path.
+7. Apply the read-only syntax policy, `EXPLAIN` check, execution timeout, and
+   result limits described in `overview.md`. A label grant never bypasses them.
+
+## Example
+
+```text
+(analyst_01:User)
+    └─ HAS_ROLE → (customer_reader:Role {privileges: ["readOnly"]})
+                      └─ HAS_ACCESS_OF_NODE → (:AccessNode {name: "Customer"})
+```
+
+This user may read authorized `Customer` nodes through the validated proxy.
+The role grants no access to `Order` nodes. A query that also accesses `Order`
+requires another applicable grant, and write queries remain rejected.
+
+## Scope and open decisions
+
+This draft defines label-level grants only. It does not yet define permissions
+for relationship types, individual properties, rows, or separate databases.
+Before enabling relationship traversal, path returns, or whole-node returns,
+define how those operations avoid exposing restricted nodes, relationships,
+and properties. Reject unsupported access forms until their checks are defined.
