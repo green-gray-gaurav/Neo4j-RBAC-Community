@@ -1,0 +1,24 @@
+[Unit]
+Description=Neo4j RBAC API
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=neo4j-rbac
+Group=neo4j-rbac
+WorkingDirectory=/opt/neo4j-rbac
+EnvironmentFile=/etc/neo4j-rbac/service.env
+ExecStart=/usr/bin/java -Xms64m -Xmx512m -XX:ActiveProcessorCount=4 -jar /opt/neo4j-rbac/service.jar
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=35
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictSUIDSGID=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

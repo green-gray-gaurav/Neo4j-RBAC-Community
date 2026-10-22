@@ -3,3 +3,9 @@ target/
 .idea/
 *.iml
 .env
+__pycache__/
+*.pyc
+*.key
+service.env
+tunnel.env
+permissions.json

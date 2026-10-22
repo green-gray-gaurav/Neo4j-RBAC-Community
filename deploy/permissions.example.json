@@ -1,0 +1,6 @@
+{
+  "users": {
+    "redash_reader": "readOnly",
+    "data_writer": "full"
+  }
+}

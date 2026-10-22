@@ -1,12 +1,62 @@
-# Neo4j RBAC Community — parser and query classification
+# Neo4j RBAC Community
 
-The parser proof and query-classification component for the read-only gateway proposed in
-[overview.md](overview.md) and [RBAC](RBAC).
+Linux API on **127.0.0.1:4444**, with Neo4j login, signed JWTs, administrator-owned
+read/full permissions, bounded execution, and a read-only Redash adapter.
 
 Uses **Neo4j's official Cypher 5 parser from Neo4j 5.23.0**:
 `org.neo4j:cypher-v5-ast-factory:5.23.0`. There is no custom grammar, regex
-parser, HTTP gateway, or policy store. The optional classifier connects to Neo4j
-for `EXPLAIN` only; it never executes the supplied query.
+parser or separate UI. The standalone classifier sends `EXPLAIN` only; the API
+executes authorized data queries after classification in the same transaction.
+
+## Service
+
+```text
+Redash → local SSH tunnel :14444 → Linux API 127.0.0.1:4444 → Neo4j 5.23.0
+```
+
+The API supports **readOnly and full** accounts across **all labels**. The Redash
+adapter always requests read-only execution, even if its account was accidentally
+given full permission. Full means data reads/writes, not schema changes,
+administration, procedures, or custom functions. There is no per-label filtering
+in this release. See [SERVICE.md](SERVICE.md) for installation, API examples,
+limits, Linux services, tunnel setup, Redash registration, and known boundaries.
+
+Permissions live outside Neo4j, in `/etc/neo4j-rbac/permissions.json`:
+
+```json
+{"users":{"redash_reader":"readOnly","data_writer":"full"}}
+```
+
+The service checks this file at login, on every query, and again before commit.
+Missing users are denied; malformed/unavailable configuration fails closed.
+Remove an account to revoke existing tokens immediately. Update the file with
+an atomic replacement and preserve owner `root:neo4j-rbac`, mode `0640`.
+
+### Administrator-run user setup
+
+Log into Neo4j Browser as an administrator and select `:use system`. Supply
+`$password` through the client's parameter binding, then run each command with
+the appropriate password. These are **native Neo4j users**, not nodes labeled User.
+
+```cypher
+CREATE USER redash_reader SET PASSWORD $password CHANGE NOT REQUIRED;
+CREATE USER data_writer SET PASSWORD $password CHANGE NOT REQUIRED;
+SHOW USERS;
+```
+
+Password rotation/removal, also run directly by the administrator:
+
+```cypher
+ALTER USER redash_reader SET PASSWORD $password CHANGE NOT REQUIRED;
+DROP USER redash_reader IF EXISTS;
+```
+
+Then add the corresponding usernames/modes to the permissions file. No Cypher
+`GRANT ROLE` command is needed: Community users do not have database-enforced
+read-only permissions. Restrict direct Bolt/HTTP database access to trusted hosts
+so clients cannot bypass the API. JWTs issued before a native password change or
+user deletion remain valid for at most five minutes; remove the file entry for
+immediate API revocation.
 
 ## Run
 
@@ -148,8 +198,8 @@ The adapter is isolated in `CypherParserProof` to keep that dependency visible.
 5. **Redash adapter.** Verified identity contract for interactive and scheduled queries.
 6. **Adversarial testing.** End-to-end authorization and bypass tests against 5.23.0.
 
-The parser proof and EXPLAIN classifier are implemented. Policy storage, label
-authorization, query execution, and Redash integration remain future work.
+The parser, classifier, all-label API, permissions file and Redash adapter are
+implemented. Graph-based per-label authorization remains future work.
 
 ## Contributors
 

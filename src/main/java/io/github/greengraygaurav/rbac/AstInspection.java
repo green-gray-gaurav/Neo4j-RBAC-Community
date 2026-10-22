@@ -21,6 +21,24 @@ public final class AstInspection {
         return List.copyOf(entries);
     }
 
+    public static List<ASTNode> nodes(Statement statement) {
+        var nodes = new ArrayList<ASTNode>();
+        collect(statement, nodes);
+        return List.copyOf(nodes);
+    }
+
+    private static void collect(Object value, List<ASTNode> nodes) {
+        if (value instanceof ASTNode node) nodes.add(node);
+        if (value instanceof Option<?> option) {
+            if (option.isDefined()) collect(option.get(), nodes);
+        } else if (value instanceof Iterable<?> iterable) {
+            var iterator = iterable.iterator();
+            while (iterator.hasNext()) collect(iterator.next(), nodes);
+        } else if (value instanceof Product product) {
+            for (int i = 0; i < product.productArity(); i++) collect(product.productElement(i), nodes);
+        }
+    }
+
     // Scala AST case classes may wrap children in Option, sequences, sets and tuples.
     // Walk those containers as well, so nested branches are not silently skipped.
     private static void walk(Object value, String path, List<Entry> entries) {

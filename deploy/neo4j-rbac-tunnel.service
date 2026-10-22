@@ -1,0 +1,19 @@
+[Unit]
+Description=Redash to Neo4j RBAC SSH tunnel
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=redash-tunnel
+EnvironmentFile=/etc/neo4j-rbac-tunnel/tunnel.env
+ExecStart=/usr/bin/ssh -NT -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/etc/neo4j-rbac-tunnel/known_hosts -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -i /etc/neo4j-rbac-tunnel/id_ed25519 -L 127.0.0.1:14444:127.0.0.1:4444 ${RBAC_SSH_TARGET}
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

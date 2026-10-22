@@ -1,4 +1,4 @@
-name: Parser proof
+name: Neo4j RBAC checks
 on: [push, pull_request]
 permissions:
   contents: read
@@ -14,3 +14,9 @@ jobs:
           cache: maven
       - run: ./mvnw --batch-mode clean verify
       - run: ./mvnw --batch-mode -q exec:java < examples/read.cypher
+      - run: ./mvnw --batch-mode -q exec:java -Dexec.classpathScope=test -Dexec.mainClass=io.github.greengraygaurav.rbac.PackagedServiceSmoke -Dexec.args=target/neo4j-rbac-parser-proof-0.1.0-SNAPSHOT-service.jar
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s redash -p 'test_*.py'
+      - run: sh -n deploy/install.sh

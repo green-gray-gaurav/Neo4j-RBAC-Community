@@ -1,5 +1,16 @@
 # Role-Based Access Control (RBAC)
 
+## Current service implementation
+
+The current API authenticates native Neo4j users, issues JWTs, and loads
+`readOnly`/`full` grants from an administrator-owned JSON configuration file.
+Both modes cover all labels; Redash always requests read-only execution.
+Full permits data modifications but not schema, administrative commands,
+procedures, or custom functions. See README.md and SERVICE.md.
+
+The graph model below is a future per-label design. It is not the active policy
+store, and creating these nodes does not grant access to the current API.
+
 ## Purpose
 
 Define which node labels an authenticated user can query through the Cypher

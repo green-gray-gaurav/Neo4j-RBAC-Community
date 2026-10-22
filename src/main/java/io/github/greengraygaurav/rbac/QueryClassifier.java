@@ -71,17 +71,21 @@ public final class QueryClassifier {
         }
         try {
             var type = explain.type(query, parameters);
-            if (type == null) return new Classification(Kind.UNKNOWN, null, "Missing EXPLAIN plan or query type");
-            return switch (type) {
+            return classifyParsed(statement, type);
+        } catch (Neo4jException error) {
+            // Auth, planning, unavailable procedures and network failures must never become READ_ONLY.
+            return new Classification(Kind.UNKNOWN, null, "EXPLAIN failed (" + error.code() + ")");
+        }
+    }
+
+    static Classification classifyParsed(org.neo4j.cypher.internal.ast.Statement statement, QueryType type) {
+        if (type == null) return new Classification(Kind.UNKNOWN, null, "Missing EXPLAIN plan or query type");
+        return switch (type) {
                 case READ_ONLY -> new Classification(
                         statement.containsUpdates() ? Kind.UNKNOWN : Kind.READ_ONLY, type,
                         statement.containsUpdates() ? "AST and server classification disagree" : "Server classified read-only");
                 case READ_WRITE, WRITE_ONLY -> new Classification(Kind.MODIFY, type, "Server classified data modification");
                 case SCHEMA_WRITE -> new Classification(Kind.SCHEMA, type, "Server classified schema modification");
-            };
-        } catch (Neo4jException error) {
-            // Auth, planning, unavailable procedures and network failures must never become READ_ONLY.
-            return new Classification(Kind.UNKNOWN, null, "EXPLAIN failed (" + error.code() + ")");
-        }
+        };
     }
 }

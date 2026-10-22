@@ -1,3 +1,6 @@
 * text=auto
 mvnw text eol=lf
 mvnw.cmd text eol=crlf
+*.sh text eol=lf
+*.service text eol=lf
+*.example text eol=lf
