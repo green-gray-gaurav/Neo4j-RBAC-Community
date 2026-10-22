@@ -9,8 +9,20 @@
     <maven.compiler.release>21</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <neo4j.version>5.23.0</neo4j.version>
+    <exec.mainClass>io.github.greengraygaurav.rbac.ParserProofCli</exec.mainClass>
   </properties>
   <dependencies>
+    <dependency>
+      <groupId>org.neo4j.driver</groupId>
+      <artifactId>neo4j-java-driver</artifactId>
+      <version>${neo4j.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.neo4j.test</groupId>
+      <artifactId>neo4j-harness</artifactId>
+      <version>${neo4j.version}</version>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.neo4j</groupId>
       <artifactId>cypher-v5-ast-factory</artifactId>
@@ -34,12 +46,13 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>3.5.4</version>
+        <configuration><argLine>-XX:ActiveProcessorCount=4</argLine></configuration>
       </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
         <version>3.5.0</version>
-        <configuration><mainClass>io.github.greengraygaurav.rbac.ParserProofCli</mainClass></configuration>
+        <configuration><mainClass>${exec.mainClass}</mainClass></configuration>
       </plugin>
     </plugins>
   </build>

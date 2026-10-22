@@ -1,11 +1,12 @@
-# Neo4j RBAC Community — parser proof
+# Neo4j RBAC Community — parser and query classification
 
-The first implementation milestone for the read-only gateway proposed in
+The parser proof and query-classification component for the read-only gateway proposed in
 [overview.md](overview.md) and [RBAC](RBAC).
 
 Uses **Neo4j's official Cypher 5 parser from Neo4j 5.23.0**:
 `org.neo4j:cypher-v5-ast-factory:5.23.0`. There is no custom grammar, regex
-parser, database connection, HTTP gateway, policy store, or query execution.
+parser, HTTP gateway, or policy store. The optional classifier connects to Neo4j
+for `EXPLAIN` only; it never executes the supplied query.
 
 ## Run
 
@@ -56,6 +57,77 @@ The direct parser entry point accepts statement bodies. It intentionally rejects
 is outside this proof. It does not prove bounded CPU/memory use for hostile input
 or full semantic equivalence of every possible printer round trip.
 
+## Query classification
+
+`QueryClassifier` uses the official Java driver **5.23.0**, with one explicitly
+selected database and a positive transaction timeout. Reuse the application's
+`Driver`; the classifier opens and closes a session for each request.
+
+```java
+var classifier = new QueryClassifier(driver, "neo4j", Duration.ofSeconds(5));
+var result = classifier.classify(
+    "MATCH (c:Customer) WHERE c.id = $id RETURN c.name",
+    Map.of("id", 42L));
+boolean eligible = result.eligibleFor(QueryClassifier.Mode.READ_ONLY);
+```
+
+The flow is: parse exactly one statement body → recognize schema/admin ASTs →
+`EXPLAIN` ordinary queries on Neo4j → inspect `ResultSummary.queryType()`.
+The original body and typed parameters are passed unchanged, prefixed with
+`EXPLAIN` and a newline. User-supplied `CYPHER`, `EXPLAIN`, and `PROFILE` prefixes
+are rejected before any server request. There is no query retry or classification cache.
+
+| Classification | Meaning | READ_ONLY eligibility | FULL eligibility |
+| --- | --- | --- | --- |
+| `READ_ONLY` | Server reports `READ_ONLY`, with no conflicting AST update flag | Yes | Yes |
+| `MODIFY` | Server reports `READ_WRITE` or `WRITE_ONLY` | No | Yes |
+| `SCHEMA` | Native schema-command AST or server `SCHEMA_WRITE` | No | Yes |
+| `ADMINISTRATIVE` | Native administrative-command AST, including `SHOW USERS` | No | Yes |
+| `UNKNOWN` | Invalid input, planning/auth/connection failure, missing plan/type, or AST/server disagreement | No | No |
+
+Schema/admin categories are recognized locally and do not require a server
+request; their `serverType` is null. They are not validated against server permissions.
+For data queries, Neo4j resolves installed procedures during EXPLAIN, so a
+registered WRITE procedure is classified as `MODIFY` even when the standalone
+AST's `containsUpdates()` says false. Unavailable procedures become `UNKNOWN`.
+
+**Eligibility is not authorization or execution.** FULL does not elevate database
+permissions. READ_ONLY describes database modification behavior, not absence of
+external side effects: read procedures/functions and `LOAD CSV` can access files
+or networks. The later gateway policy must reject unreviewed procedures/functions
+and `LOAD CSV`, and enforce label access. Classification trusts Neo4j's registered
+procedure/function metadata and is scoped to the database, identity, and installed
+extensions used for EXPLAIN; it must not be reused across changes to that context.
+The timeout bounds the server transaction, not all parsing or wall-clock work.
+
+### Classifier CLI
+
+Set `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, and `NEO4J_DATABASE` in the
+process environment using your secret manager or hidden prompt. Do not pass
+credentials as CLI arguments or commit them to files. The CLI uses five-second
+connection, acquisition, and EXPLAIN timeouts. Its simple stdin interface uses
+no parameters; use the Java API above for parameterized queries.
+
+```powershell
+Get-Content -Raw examples/read.cypher | .\mvnw.cmd -q exec:java '-Dexec.mainClass=io.github.greengraygaurav.rbac.ClassifyCli'
+# Optional: append '-Dexec.args=FULL' to report FULL eligibility.
+```
+
+```sh
+./mvnw -q exec:java -Dexec.mainClass=io.github.greengraygaurav.rbac.ClassifyCli < examples/read.cypher
+```
+
+Output includes kind, native server type (when available), selected mode, and
+eligibility. Exit code is 0 for eligible, 2 for rejected/unknown, and nonzero for
+configuration errors. Even FULL mode sends only EXPLAIN, never the original query
+for execution. The existing parser-inspection CLI remains the default main class.
+
+`./mvnw clean verify` also starts a disposable **Neo4j 5.23.0** server over Bolt
+through the test-only Neo4j harness. No Docker or external database is needed.
+It checks reads, writes, nested writes, parameters, procedure modes, semantic
+failures, and missing databases, and verifies no nodes, indexes, or procedure
+side effects were produced by classification. The harness is not a runtime dependency.
+
 ## Sources and version boundary
 
 All Neo4j artifacts are pinned to 5.23.0. These are Neo4j internal APIs; changing
@@ -76,7 +148,8 @@ The adapter is isolated in `CypherParserProof` to keep that dependency visible.
 5. **Redash adapter.** Verified identity contract for interactive and scheduled queries.
 6. **Adversarial testing.** End-to-end authorization and bypass tests against 5.23.0.
 
-Only milestone 1 is implemented. No claim of safe query execution is made.
+The parser proof and EXPLAIN classifier are implemented. Policy storage, label
+authorization, query execution, and Redash integration remain future work.
 
 ## Contributors
 
