@@ -77,3 +77,9 @@ The adapter is isolated in `CypherParserProof` to keep that dependency visible.
 6. **Adversarial testing.** End-to-end authorization and bypass tests against 5.23.0.
 
 Only milestone 1 is implemented. No claim of safe query execution is made.
+
+## Contributors
+
+- **OpenAI Codex (AI coding assistant)** — assisted with the Neo4j 5.23.0
+  parser proof, AST inspection, tests, build setup, and documentation under
+  the repository owner's direction.
