@@ -1,0 +1,11 @@
+.git
+.tools
+**/.local
+**/__pycache__
+.playwright-cli
+output
+**/*.key
+**/service.env
+**/tunnel.env
+target/**
+!target/neo4j-rbac-parser-proof-0.1.0-SNAPSHOT-service.jar

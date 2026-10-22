@@ -153,8 +153,10 @@ Copy `redash/neo4j_rbac.py` into your Redash image at
 image; supply its exact current tag as the `REDASH_IMAGE` build argument.
 Set `REDASH_ADDITIONAL_QUERY_RUNNERS=redash.query_runner.neo4j_rbac` (append to any
 existing runners), and deploy the same image/config to Redash web and workers.
-The adapter follows Redash 10.1.0's BaseQueryRunner contract and uses only Python's
-standard library; verify it on your deployed Redash release before rollout.
+The adapter uses Redash 26.9.0's BaseQueryRunner contract, returning structured
+columns/rows, and uses only Python's standard library. Older releases that expect
+encoded JSON results require a compatibility change; verify your deployed release
+before rollout.
 
 Create a **Neo4j RBAC (read-only)** data source with:
 
@@ -173,9 +175,10 @@ remain query text; use the HTTP/Java API for typed Cypher parameter binding.
 Nested graph objects are JSON strings in Redash cells. Duplicate column names are
 disambiguated. No schema-browser endpoint is exposed. Test the data-source
 connection, run `MATCH(n) RETURN labels(n), count(*)`, and verify a scheduled refresh.
-Attempting CREATE must fail without changing data. A real Redash installation,
-remote SSH tunnel and target Linux host are deployment acceptance checks, not
-things the local automated tests claim to have exercised.
+Attempting CREATE must fail without changing data. The [local Redash test
+stack](redash/test-stack/README.md) exercises actual Redash web, workers and
+scheduling against the gateway and Neo4j. The remote SSH tunnel and target Linux
+host remain separate deployment acceptance checks.
 
 ## Verification
 

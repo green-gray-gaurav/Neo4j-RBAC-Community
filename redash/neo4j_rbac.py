@@ -69,7 +69,9 @@ class Neo4jRBAC(BaseQueryRunner):
             data = {"columns": columns, "rows": [
                 {column["name"]: self._cell(value, column["type"])
                  for column, value in zip(columns, row)} for row in rows]}
-            return json.dumps(data, allow_nan=False), None
+            # Redash 26.9 serializes the structured result itself.
+            json.dumps(data, allow_nan=False)
+            return data, None
         except HTTPError as error:
             # Do not surface request headers, credentials, tokens, or untrusted upstream bodies.
             try:

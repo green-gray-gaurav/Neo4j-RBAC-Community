@@ -10,6 +10,8 @@ executes authorized data queries after classification in the same transaction.
 
 ## Service
 
+For a complete local Redash environment, see [the disposable test stack](redash/test-stack/README.md).
+
 ```text
 Redash → local SSH tunnel :14444 → Linux API 127.0.0.1:4444 → Neo4j 5.23.0
 ```

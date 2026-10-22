@@ -76,7 +76,7 @@ class AdapterTest(unittest.TestCase):
         for user in (object(), None):
             result, error = self.runner.run_query("MATCH(n) RETURN n", user)
             self.assertIsNone(error)
-            result = json.loads(result)
+            self.assertIsInstance(result, dict)
             self.assertEqual(["n", "obj", "nothing", "n1"], [c["name"] for c in result["columns"]])
             self.assertEqual("integer", result["columns"][0]["type"])
             self.assertEqual("string", result["columns"][3]["type"])

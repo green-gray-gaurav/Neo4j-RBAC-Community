@@ -9,3 +9,6 @@ __pycache__/
 service.env
 tunnel.env
 permissions.json
+.local/
+output/playwright/
+.playwright-cli/

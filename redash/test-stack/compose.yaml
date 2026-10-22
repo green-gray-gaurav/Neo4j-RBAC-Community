@@ -1,0 +1,101 @@
+name: neo4j-rbac-test
+
+x-redash: &redash
+  image: neo4j-rbac-redash-test:26.9.0
+  build:
+    context: ../..
+    dockerfile: redash/Dockerfile
+    args:
+      REDASH_IMAGE: redash/redash:26.9.0
+  network_mode: service:gateway
+  env_file: .local/stack.env
+  environment:
+    REDASH_HOST: http://localhost:5000
+    REDASH_REDIS_URL: redis://redis:6379/0
+    REDASH_DATABASE_URL: postgresql://redash:${POSTGRES_PASSWORD}@postgres/redash
+    REDASH_ADDITIONAL_QUERY_RUNNERS: redash.query_runner.neo4j_rbac
+    REDASH_GUNICORN_BIND: 0.0.0.0:5000
+    REDASH_WEB_WORKERS: '2'
+    REDASH_LOG_LEVEL: WARNING
+    REDASH_ENFORCE_CSRF: 'true'
+    REDASH_DISABLE_PUBLIC_URLS: 'true'
+  volumes:
+    - ./:/app/rbac_test:ro
+    - ./.local:/app/rbac_test/.local:rw
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:16-bookworm
+    environment:
+      POSTGRES_DB: redash
+      POSTGRES_USER: redash
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes: [postgres:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U redash -d redash']
+      interval: 3s
+      retries: 30
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 3s
+      retries: 30
+  neo4j:
+    image: neo4j:5.23.0-community-ubi9
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD}
+      NEO4J_server_memory_heap_initial__size: 128m
+      NEO4J_server_memory_heap_max__size: 512m
+      NEO4J_server_memory_pagecache_size: 64m
+    volumes: [neo4j:/data]
+    healthcheck:
+      test: [CMD, bash, -c, 'echo > /dev/tcp/127.0.0.1/7687 && echo > /dev/tcp/127.0.0.1/7474']
+      interval: 5s
+      start_period: 20s
+      retries: 40
+  gateway:
+    image: neo4j-rbac-gateway-test:local
+    build:
+      context: ../..
+      dockerfile: redash/test-stack/Gateway.Dockerfile
+    env_file: .local/stack.env
+    environment:
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USERNAME: neo4j
+      NEO4J_DATABASE: neo4j
+      RBAC_JWT_KEY_FILE: /config/jwt.key
+      RBAC_PERMISSIONS_FILE: /config/permissions.json
+    volumes: [./.local:/config:ro]
+    ports: ['127.0.0.1:5000:5000']
+    depends_on:
+      neo4j: {condition: service_healthy}
+    restart: unless-stopped
+  server:
+    <<: *redash
+    command: server
+    depends_on:
+      gateway: {condition: service_started}
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+  worker:
+    <<: *redash
+    command: worker
+    environment:
+      REDASH_HOST: http://localhost:5000
+      REDASH_REDIS_URL: redis://redis:6379/0
+      REDASH_DATABASE_URL: postgresql://redash:${POSTGRES_PASSWORD}@postgres/redash
+      REDASH_ADDITIONAL_QUERY_RUNNERS: redash.query_runner.neo4j_rbac
+      REDASH_LOG_LEVEL: WARNING
+      QUEUES: queries,scheduled_queries,schemas,periodic,emails,default
+      WORKERS_COUNT: '1'
+    depends_on: [server]
+  scheduler:
+    <<: *redash
+    command: scheduler
+    depends_on: [server]
+
+volumes:
+  postgres:
+  neo4j:
